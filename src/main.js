@@ -84,98 +84,33 @@ function posView() {
 }
 function productCards() { const q = ($('productSearch')?.value||'').toLowerCase(), c = $('productCategory')?.value||''; const rows=products.filter(p=>(!c||p.category===c)&&p.name.toLowerCase().includes(q)); return rows.length?rows.map(p=>`<button class="product-card" data-add="${p.id}" ${p.stock<=0?'disabled':''}><b>${escapeHtml(p.name)}</b><span>${peso(p.selling_price)}</span><small>${p.stock} in stock · ${escapeHtml(p.category||'Uncategorized')}</small></button>`).join(''):'<p class="empty">No matching products.</p>'; }
 function cartView() {
-  if (!cart.length) {
-    return '<p class="empty">No items yet. Select products to begin.</p>';
-  }
+  if (!cart.length) return '<p class="empty">No items yet. Select products to begin.</p>';
 
-  const total = cart.reduce((n, x) => n + x.qty * x.price, 0);
-  const cost = cart.reduce((n, x) => n + x.qty * x.cost, 0);
+  const total = cart.reduce((sum, item) => sum + item.qty * item.price, 0);
+  const cost = cart.reduce((sum, item) => sum + item.qty * item.cost, 0);
 
-  return `${cart.map(x => `
+  return `${cart.map(item => `
     <div class="cart-row">
-      <div>
-        <b>${escapeHtml(x.name)}</b>
-        <small>${peso(x.price)} each</small>
+      <div class="cart-item-info">
+        <b>${escapeHtml(item.name)}</b>
+        <small>${peso(item.price)} each</small>
       </div>
-
       <div class="quantity-control">
-        <button type="button" data-step="-1" data-id="${x.id}">−</button>
-        <input
-          type="number"
-          min="1"
-          max="${x.stock}"
-          value="${x.qty}"
-          data-qty="${x.id}"
-        >
-        <button type="button" data-step="1" data-id="${x.id}">+</button>
+        <button type="button" class="quantity-button" data-step="-1" data-id="${item.id}" aria-label="Decrease quantity">−</button>
+        <input type="number" min="1" max="${item.stock}" step="1" value="${item.qty}" data-qty="${item.id}" aria-label="Quantity for ${escapeHtml(item.name)}">
+        <button type="button" class="quantity-button" data-step="1" data-id="${item.id}" aria-label="Increase quantity">+</button>
       </div>
-
-      <b>${peso(x.qty * x.price)}</b>
-      <button class="icon-btn" data-remove="${x.id}">×</button>
+      <b>${peso(item.qty * item.price)}</b>
+      <button type="button" class="icon-btn" data-remove="${item.id}" aria-label="Remove ${escapeHtml(item.name)}">×</button>
     </div>
   `).join('')}
-
   <div class="totals">
     <div><span>Estimated cost</span><b>${peso(cost)}</b></div>
     <div><span>Estimated profit</span><b class="positive">${peso(total - cost)}</b></div>
     <div class="grand"><span>Total due</span><b>${peso(total)}</b></div>
   </div>`;
 }
-
-function bindCart() {
-  const container = $('cartContent');
-  if (!container) return;
-
-  // Use property handlers so listeners never accumulate.
-  container.onclick = (e) => {
-    const stepButton = e.target.closest('[data-step]');
-    const removeButton = e.target.closest('[data-remove]');
-
-    if (stepButton) {
-      const line = cart.find(x => x.id === stepButton.dataset.id);
-      if (!line) return;
-
-      const nextQty = line.qty + Number(stepButton.dataset.step);
-
-      if (nextQty < 1) return;
-      if (nextQty > line.stock) {
-        notify('Not enough stock.', true);
-        return;
-      }
-
-      line.qty = nextQty;
-      container.innerHTML = cartView();
-      $('saveSale').disabled = !cart.length;
-      return;
-    }
-
-    if (removeButton) {
-      cart = cart.filter(x => x.id !== removeButton.dataset.remove);
-      container.innerHTML = cartView();
-      $('saveSale').disabled = !cart.length;
-    }
-  };
-
-  container.onchange = (e) => {
-    const id = e.target.dataset.qty;
-    if (!id) return;
-
-    const line = cart.find(x => x.id === id);
-    if (!line) return;
-
-    const qty = Number(e.target.value);
-
-    if (!Number.isInteger(qty) || qty < 1 || qty > line.stock) {
-      notify('Enter a valid quantity within stock.', true);
-      container.innerHTML = cartView();
-      return;
-    }
-
-    line.qty = qty;
-    container.innerHTML = cartView();
-    $('saveSale').disabled = !cart.length;
-  };
-}function inventoryView() { return `<section class="panel"><div class="panel-head"><div><h2>Product inventory</h2><p class="muted">Manage costs, prices, and stock.</p></div><button class="button primary" id="addProduct">＋ Add product</button></div><div class="toolbar"><input id="inventorySearch" placeholder="Search products…"><span class="muted">${products.length} products</span></div><div class="table-wrap"><table><thead><tr><th>Product</th><th>Category</th><th>Cost</th><th>Selling price</th><th>Profit / unit</th><th>Stock</th><th>Low alert</th><th></th></tr></thead><tbody id="inventoryRows">${inventoryRows()}</tbody></table></div></section>`; }
+function inventoryView() { return `<section class="panel"><div class="panel-head"><div><h2>Product inventory</h2><p class="muted">Manage costs, prices, and stock.</p></div><button class="button primary" id="addProduct">＋ Add product</button></div><div class="toolbar"><input id="inventorySearch" placeholder="Search products…"><span class="muted">${products.length} products</span></div><div class="table-wrap"><table><thead><tr><th>Product</th><th>Category</th><th>Cost</th><th>Selling price</th><th>Profit / unit</th><th>Stock</th><th>Low alert</th><th></th></tr></thead><tbody id="inventoryRows">${inventoryRows()}</tbody></table></div></section>`; }
 function inventoryRows() { const q=($('inventorySearch')?.value||'').toLowerCase(); const rows=products.filter(p=>(p.name+' '+(p.category||'')).toLowerCase().includes(q)); return rows.length?rows.map(p=>`<tr><td><b>${escapeHtml(p.name)}</b></td><td>${escapeHtml(p.category||'—')}</td><td>${peso(p.cost_price)}</td><td>${peso(p.selling_price)}</td><td class="positive">${peso(p.selling_price-p.cost_price)}</td><td><span class="tag ${p.stock<=p.low_stock_at?'warn':'good'}">${p.stock}</span></td><td>${p.low_stock_at}</td><td><button class="button small secondary" data-edit-product="${p.id}">Edit</button> <button class="button small danger" data-delete-product="${p.id}">Delete</button></td></tr>`).join(''):'<tr><td colspan="8" class="empty">No products yet.</td></tr>'; }
 function historyView() { return `<section class="panel"><div class="panel-head"><div><h2>Sales history</h2><p class="muted">Completed and voided transactions.</p></div><button class="button secondary" id="exportSales">Export CSV</button></div><div class="toolbar"><input type="date" id="historyDate"><select id="historyStatus"><option value="">All statuses</option><option value="completed">Completed</option><option value="void">Void</option></select></div><div class="table-wrap"><table><thead><tr><th>Date / time</th><th>Items</th><th>Sales</th><th>Cost</th><th>Profit</th><th>Status</th><th></th></tr></thead><tbody id="historyRows">${historyRows()}</tbody></table></div></section>`; }
 function historyRows() { const date=$('historyDate')?.value||'',status=$('historyStatus')?.value||''; const rows=sales.filter(s=>(!date||String(s.created_at).slice(0,10)===date)&&(!status||s.status===status)); return rows.length?rows.map(s=>`<tr><td>${new Date(s.created_at).toLocaleString('en-PH')}</td><td>${saleItems(s).map(i=>`${escapeHtml(i.product_name)} × ${i.quantity}`).join('<br>')}</td><td>${peso(s.total_amount)}</td><td>${peso(s.total_cost)}</td><td class="positive">${peso(s.total_amount-s.total_cost)}</td><td><span class="tag ${s.status==='void'?'warn':'good'}">${s.status}</span></td><td>${s.status==='completed'?`<button class="button small danger" data-void-sale="${s.id}">Void</button>`:'—'}</td></tr>`).join(''):'<tr><td colspan="7" class="empty">No transactions found.</td></tr>'; }
@@ -196,7 +131,62 @@ function bindPage(){
   $('addExpense')?.addEventListener('click',expenseForm); $('pageContent')?.addEventListener('click',async e=>{const b=e.target.closest('[data-delete-expense]');if(b&&confirm('Delete this expense?')){const {error}=await supabase.from('expenses').delete().eq('id',b.dataset.deleteExpense);if(error)notify(error.message,true);else{notify('Expense deleted.');loadData();}}});
   $('applyReport')?.addEventListener('click',()=>{state.from=$('reportFrom').value;state.to=$('reportTo').value;render();}); $('exportReport')?.addEventListener('click',()=>exportCsv('report')); $('exportSales')?.addEventListener('click',()=>exportCsv('sales'));
 }
-function bindCart(){ $('cartContent')?.addEventListener('change',e=>{const id=e.target.dataset.qty;if(!id)return;const line=cart.find(x=>x.id===id);const qty=Math.floor(Number(e.target.value));if(!line)return;if(!Number.isInteger(qty)||qty<1||qty>line.stock){notify('Enter a valid quantity within stock.',true);return;}line.qty=qty;$('cartContent').innerHTML=cartView();bindCart();});$('cartContent')?.addEventListener('click',e=>{const b=e.target.closest('[data-remove]');if(!b)return;cart=cart.filter(x=>x.id!==b.dataset.remove);$('cartContent').innerHTML=cartView();$('saveSale').disabled=!cart.length;bindCart();}); }
+function bindCart() {
+  const container = $('cartContent');
+  if (!container) return;
+
+  // Assign handlers to the cart container itself so re-rendering its contents
+  // never adds duplicate event listeners.
+  container.onclick = (event) => {
+    const stepButton = event.target.closest('[data-step]');
+    const removeButton = event.target.closest('[data-remove]');
+
+    if (stepButton) {
+      const item = cart.find(row => row.id === stepButton.dataset.id);
+      if (!item) return;
+
+      const nextQuantity = item.qty + Number(stepButton.dataset.step);
+      if (nextQuantity < 1) return;
+      if (nextQuantity > item.stock) {
+        notify('Not enough stock.', true);
+        return;
+      }
+
+      item.qty = nextQuantity;
+      container.innerHTML = cartView();
+      const saveButton = $('saveSale');
+      if (saveButton) saveButton.disabled = cart.length === 0;
+      return;
+    }
+
+    if (removeButton) {
+      cart = cart.filter(row => row.id !== removeButton.dataset.remove);
+      container.innerHTML = cartView();
+      const saveButton = $('saveSale');
+      if (saveButton) saveButton.disabled = cart.length === 0;
+    }
+  };
+
+  container.onchange = (event) => {
+    const input = event.target.closest('[data-qty]');
+    if (!input) return;
+
+    const item = cart.find(row => row.id === input.dataset.qty);
+    if (!item) return;
+
+    const quantity = Number(input.value);
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > item.stock) {
+      notify(`Enter a whole number from 1 to ${item.stock}.`, true);
+      container.innerHTML = cartView();
+      return;
+    }
+
+    item.qty = quantity;
+    container.innerHTML = cartView();
+    const saveButton = $('saveSale');
+    if (saveButton) saveButton.disabled = cart.length === 0;
+  };
+}
 async function saveSale(){if(!cart.length)return;const payload=cart.map(x=>({product_id:x.id,quantity:x.qty}));$('saveSale').disabled=true;const {error}=await supabase.rpc('create_sale',{items:payload});if(error){notify(error.message,true);$('saveSale').disabled=false;return;}cart=[];notify('Sale saved. Inventory updated on all connected devices.');await loadData();}
 function exportCsv(kind){let rows;if(kind==='sales')rows=[['Date','Status','Products','Revenue','Cost','Profit'],...sales.map(s=>[s.created_at,s.status,saleItems(s).map(i=>`${i.product_name} x${i.quantity}`).join('; '),s.total_amount,s.total_cost,s.total_amount-s.total_cost])];else{const from=$('reportFrom').value,to=$('reportTo').value;rows=[['Date','Type','Description','Amount'],...activeSales().filter(s=>{const d=String(s.created_at).slice(0,10);return d>=from&&d<=to;}).map(s=>[s.created_at,'Sale','Completed sale',s.total_amount]),...expenses.filter(e=>e.expense_date>=from&&e.expense_date<=to).map(e=>[e.expense_date,'Expense',e.description,e.amount])];}const csv=rows.map(r=>r.map(v=>`"${String(v??'').replaceAll('"','""')}"`).join(',')).join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download=`mercan-${kind}-${todayLocal()}.csv`;a.click();URL.revokeObjectURL(a.href);}
 
